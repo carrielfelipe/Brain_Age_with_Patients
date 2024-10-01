@@ -23,6 +23,16 @@ class Plotter:
     def __init__(self):
         pass
 
+    def regression_metrics(self, y_true, y_pred):
+        """
+        Calcula las métricas de regresión: MAE, MSE, RMSE y R2.
+        """
+        mae = mean_absolute_error(y_true, y_pred)
+        mse = mean_squared_error(y_true, y_pred)
+        rmse = np.sqrt(mse)
+        r2 = r2_score(y_true, y_pred)
+        return mae, mse, rmse, r2
+
 
 
     def plot_search_best_model(self, opt_model, num_max=100, x_size=4, y_size=4, color='navy', linewidth=1, legend_result=True, font='DejaVu Sans', fontsize='12'):
@@ -153,15 +163,7 @@ class Plotter:
 
 
 
-    def regression_metrics(self, y_true, y_pred):
-        """
-        Calcula las métricas de regresión: MAE, MSE, RMSE y R2.
-        """
-        mae = mean_absolute_error(y_true, y_pred)
-        mse = mean_squared_error(y_true, y_pred)
-        rmse = np.sqrt(mse)
-        r2 = r2_score(y_true, y_pred)
-        return mae, mse, rmse, r2
+    
 
 
     def plot_regresion(self,x ,y , x_size=4, y_size=4, label_='', color='navy', alpha=0.5, color_line_fit='red', color_line_ideal='purple', color_confidence_interval='blue' , alpha_confidence_interval=0.6, title='',
@@ -396,15 +398,19 @@ class Plotter:
         plt.show()
 
 
-    def plot_metricas_evaluacion(self, results,name_set='Cross Validation',save_fig=False):
+    def plot_metricas_evaluacion(self, results,labels=None, name_set='Cross Validation'):
         metrics = ['mae', 'mse', 'rmse', 'r2']
         # Graficar las métricas para cada conjunto
         plt.figure(figsize=(7, 7))
         for i, metric in enumerate(metrics):
             plt.subplot(2, 2, i + 1)
-            plt.plot(range(1, 11), results['train'][metric], label='Training')
-            plt.plot(range(1, 11), results['val'][metric], label='Validation')
-            plt.plot(range(1, 11), results['test'][metric], label='Test')
+
+            for i, df in enumerate(results):
+                label = labels[i]
+                plt.plot(range(1, 11), results[label][metric], label=label)
+            #plt.plot(range(1, 11), results['val'][metric], label='Validation')
+            #plt.plot(range(1, 11), results['test'][metric], label='Test')
+            
             plt.title(f'{metric.upper()} - {name_set}')
             plt.xlabel('Fold', fontweight='bold', fontsize=12)
             plt.ylabel(f'{metric.upper()}', fontweight='bold', fontsize=12)
@@ -489,45 +495,51 @@ class Plotter:
 
 
 
-    def plot_gap_distribution(self, df_errors, colores_personalizados, x_limits=(-3, 5), title='GAP Distribution'):
+    def plot_gap_distribution(self, df_errors, colores_personalizados, x_limits=(-4, 4), title='GAP Distribution',
+                           x_size=4, y_size=4, xlabel='', ylabel='', font='DejaVu Sans', fontsize=12, weight='normal'):
         # Crear el diagrama de cajas y los puntos individuales en forma horizontal
-        plt.figure(figsize=(8, 4))
+        plt.figure(figsize=(x_size, y_size))
 
         # Boxplot con la mediana (por defecto) y la media personalizada
         sns.boxplot(y='Grupo', x='Error', data=df_errors, showfliers=False, palette=colores_personalizados, 
                     showmeans=True, 
                     meanline=True, 
-                    meanprops={"color": "blue", "ls": "--", "linewidth": 2})  # Líneas de la media personalizadas
+                    meanprops={"color": "blue", "ls": "--", "linewidth": 1.5})  # Líneas de la media personalizadas
 
         # Agregar puntos individuales
         sns.stripplot(y='Grupo', x='Error', data=df_errors, color='black', size=5, alpha=0.7, jitter=True)
 
         # Título y etiquetas
-        plt.title(title, fontsize=14, fontweight='bold')
-        plt.ylabel('', fontsize=12)
-        plt.xlabel('GAP (years)', fontsize=12)
+        plt.title(title, fontsize=fontsize+2, fontweight=weight, fontname=font)
+        plt.ylabel(ylabel, fontsize=fontsize, fontname=font)
+        plt.xlabel(xlabel, fontsize=fontsize, fontname=font)
         plt.xlim(x_limits)
         plt.xticks(np.arange(x_limits[0], x_limits[1], 1))
         plt.grid(True)
         
+        # Modificar las etiquetas del eje y
+        ax = plt.gca()  # Obtener el eje actual
+        ax.set_yticklabels(ax.get_yticklabels(), fontname=font, fontsize=fontsize-2, fontweight=weight)
+
         # Mostrar gráfico
         plt.show()
 
 
+    def plot_regression_diagnosis(self, df_list, colors, labels, title='',x_size=4, y_size=4, xlabel='',ylabel='',font='DejaVu Sans', fontsize=12, weight='normal', legend= True,
+                                x_ticks_step=10, y_ticks_step=10, mode=1, line_ideal=True, alpha=0.5, color_line_ideal='gray',
+                                x_min_limit=None, x_max_limit=None, y_min_limit=None, y_max_limit=None, xticks =1,yticks=1):
 
-    def plot_regression_diagnosis(self, df_list, colors, labels, title='Diagnosis'):
-  
-        plt.figure(figsize=(10, 8))
+        plt.figure(figsize=(x_size, y_size))
 
         # Iterar sobre cada dataframe, color y etiqueta
         for i, df in enumerate(df_list):
-            y_label = pd.to_numeric(df['y_labels'])
-            y_pred = pd.to_numeric(df['y_pred_corrected'])
+            y_label = pd.to_numeric(df.iloc[:, 0])
+            y_pred = pd.to_numeric(df.iloc[:, 1])
             label = labels[i]
             color = colors.get(label, 'black')  # Color predeterminado si no se encuentra en el diccionario
             
             # Graficar los puntos
-            plt.scatter(y_label, y_pred, color=color, label=label, alpha=0.5)
+            plt.scatter(y_label, y_pred, color=color, label=label, alpha=alpha)
             
             # Ajustar la recta de regresión
             slope, intercept = np.polyfit(y_label, y_pred, 1)
@@ -535,16 +547,70 @@ class Plotter:
             plt.plot(y_label, regression_line, color=color, linestyle='--')
             print(f"{label} - Pendiente: {slope}, Intercepto: {intercept}")
 
-        # Línea ideal
-        age_range = np.linspace(50, 80, 100)
-        plt.plot(age_range, age_range, color='gray', linestyle='-', label='Ideal Line')
-
+        if line_ideal:
+            plt.plot([0,100], [0,100], color=color_line_ideal, linestyle='-', linewidth=2, label='Ideal Line')
+        
         # Añadir detalles al gráfico
-        plt.xlabel('Chronological Age')
-        plt.ylabel('Biological Age')
-        plt.title(title)
-        plt.legend()
+        plt.xlabel(xlabel, fontweight=weight,fontname=font, fontsize=fontsize)
+        plt.ylabel(ylabel, fontweight=weight,fontname=font, fontsize=fontsize)
+        plt.title(title, fontweight=weight, fontname=font, fontsize=fontsize+2)
+        if legend:
+                plt.legend()
+        
+        
+        
+
+        if mode == 1 :
+            # Ajustar el grosor y color del borde interior del cuadro
+            for spine in plt.gca().spines.values():
+                spine.set_linewidth(1)
+                spine.set_color('black')
+        if mode ==  2:
+            # Ajustar el grosor y color del borde interior del cuadro
+            ax = plt.gca()
+            ax.spines['top'].set_visible(False)  # Ocultar borde superior
+            ax.spines['right'].set_visible(False)  # Ocultar borde derecho
+            ax.spines['left'].set_linewidth(1)
+            ax.spines['left'].set_color('black')
+            ax.spines['bottom'].set_linewidth(1)
+            ax.spines['bottom'].set_color('black')
+
+        if mode ==  3:
+            for spine in plt.gca().spines.values():
+                spine.set_linewidth(0.2)
+                spine.set_color('black')
+            
+
+
+        #Configurar números de los ejes en negrita
+        #plt.xticks(fontweight='bold')
+        #plt.yticks(fontweight='bold')
+
+        # Definir límites de los ejes
+        x_min = x_min_limit if x_min_limit is not None else int(min(y_label) // x_ticks_step * x_ticks_step)
+        x_max = x_max_limit if x_max_limit is not None else int(max(y_label) // x_ticks_step * x_ticks_step + x_ticks_step)
+        y_min = y_min_limit if y_min_limit is not None else int(min(y_pred) // y_ticks_step * y_ticks_step)
+        y_max = y_max_limit if y_max_limit is not None else int(max(y_pred) // y_ticks_step * y_ticks_step + y_ticks_step)
+
+        plt.xticks(np.arange(x_min, x_max + x_ticks_step, x_ticks_step))
+        plt.yticks(np.arange(y_min, y_max + y_ticks_step, y_ticks_step))
+
+        # Establecer los límites de los ejes
+        plt.xlim(x_min, x_max)
+        plt.ylim(y_min, y_max)
         plt.grid(True)
+
+        if xticks==2:
+            plt.xticks(fontweight='bold')
+        if xticks ==3:
+            #plt.xticks(np.arange(x_min, x_max + x_ticks_step, x_ticks_step), [''] * len(np.arange(x_min, x_max + x_ticks_step, x_ticks_step)))
+            plt.tick_params(axis='x', which='both', bottom=False, top=False, labelbottom=False)
+
+
+        if yticks==2:
+            plt.yticks(fontweight='bold')
+        if yticks ==3:
+            plt.tick_params(axis='y', which='both', left=False, right=False, labelleft=False)
 
         # Mostrar el gráfico
         plt.show()

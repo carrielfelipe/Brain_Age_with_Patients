@@ -1,0 +1,12 @@
+Opt_Model
+
+BaggedKNN/results_model
+CatBoost/results_model
+ElasticNet/results_model
+KernelRidge/results_model
+KNN/results_model
+Lasso/results_model
+MLP/results_model
+Random_Forest/results_model
+SVR/results_model
+XGBoost/results_model

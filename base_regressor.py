@@ -100,16 +100,34 @@ class BaseRegressor:
         X_CN = df_concatenado_CN.iloc[:, :-2]  # Features
         y_CN = df_concatenado_CN.iloc[:, -2]   # Labels (Age)
         ID_CN = df_concatenado_CN.iloc[:, -1]  # IDs
+        results_per_fold_CN_train = [[None for _ in range(n_splits)] for _ in range(n_iterations)]
+        results_per_fold_CN_test = [[None for _ in range(n_splits)] for _ in range(n_iterations)]
+
 
         # Inicializar resultados
-        results = {'model': []}
-        results_labels_df_CN = pd.DataFrame(columns=['y_labels', 'y_pred', 'y_pred_corrected', 'GAP', 'GAP_corrected', 'ID-unique'])
+        results = {'model': [],
+                   'mean_X_train_kf':[],
+                   'std_X_train_kf':[],
+                   'slope': [],
+                   'intercept': [],
+                   }
+        results_labels_df_CN_train = pd.DataFrame(columns=['y_labels','y_pred','y_pred_corrected','GAP', 'GAP_corrected', 'ID-unique'])
+        results_labels_df_CN_test = pd.DataFrame(columns=['y_labels', 'y_pred', 'y_pred_corrected', 'GAP', 'GAP_corrected', 'ID-unique'])
+
+        if lista_dfs is not None:
+            results_per_fold_pat = [[[None for _ in range(n_splits)] for _ in range(n_iterations)] for _ in lista_dfs]
+
+        else:
+            results_per_fold_pat=[]
+
         results_labels_list = []
 
+        # Inicializar resultados por fold para pacientes
         # Si lista_dfs no es None, crear dataframes para almacenar resultados de pacientes
         if lista_dfs is not None:
-            for df in lista_dfs:
-                results_labels_list.append(pd.DataFrame(columns=['y_labels', 'y_pred', 'y_pred_corrected', 'GAP', 'GAP_corrected', 'ID-unique']))
+            for _ in lista_dfs:
+                results_labels_list.append(pd.DataFrame(columns=['y_labels', 'y_pred', 'y_pred_corrected', 'GAP', 'GAP_corrected','ID-unique']))
+                #results_per_fold_pat.append({})  # Diccionario por cada grupo de pacientes
         
         # Bucle de iteraciones
         for i in range(n_iterations):
@@ -126,6 +144,7 @@ class BaseRegressor:
                 train_index_CN, test_index_CN = kf_CN_splits[fold]
                 X_train_kf_CN, X_test_kf_CN = X_CN.iloc[train_index_CN], X_CN.iloc[test_index_CN]
                 y_train_kf_CN, y_test_kf_CN = y_CN.iloc[train_index_CN], y_CN.iloc[test_index_CN]
+                id_train_kf_CN = ID_CN.iloc[train_index_CN]
                 id_test_kf_CN = ID_CN.iloc[test_index_CN]
 
                 # Escalar datos de entrenamiento y prueba para CN
@@ -138,28 +157,42 @@ class BaseRegressor:
                 model = self.model_ml(**params, **self.model_params_train)
                 model.fit(X_train_kf_CN_scaled, y_train_kf_CN)
 
-                y_pred_train = model.predict(X_train_kf_CN_scaled)
-                gap_train = y_pred_train - y_train_kf_CN
+                y_pred_CN_train = model.predict(X_train_kf_CN_scaled)
+                gap_CN_train = y_pred_CN_train - y_train_kf_CN
 
                 # Hacer predicciones para el conjunto de prueba de CN
                 y_pred_CN_test = model.predict(X_test_kf_CN_scaled)
-                gap_CN = y_pred_CN_test - y_test_kf_CN
+                gap_CN_test = y_pred_CN_test - y_test_kf_CN
 
                 # Ajuste de GAP para CN
-                slope, intercept, _, _, _ = linregress(y_train_kf_CN, gap_train)
-                corrected_gap_CN = gap_CN - (slope * y_test_kf_CN + intercept)
-                y_pred_corrected_CN = y_pred_CN_test - (slope * y_test_kf_CN + intercept)
+                slope, intercept, _, _, _ = linregress(y_train_kf_CN, gap_CN_train)
+                corrected_gap_CN_train = gap_CN_train - (slope * y_train_kf_CN + intercept)
+                corrected_gap_CN_test = gap_CN_test - (slope * y_test_kf_CN + intercept)
+                y_pred_corrected_CN_test = y_pred_CN_test - (slope * y_test_kf_CN + intercept)
+                y_pred_corrected_CN_train = y_pred_CN_train - (slope * y_train_kf_CN + intercept)
 
-                # Guardar resultados de CN
-                temp_CN_df = pd.DataFrame({
+                # Guardar resultados de CN 
+                temp_CN_df_test = pd.DataFrame({
                     'y_labels': y_test_kf_CN,
                     'y_pred': y_pred_CN_test,
-                    'y_pred_corrected': y_pred_corrected_CN,
-                    'GAP': gap_CN,
-                    'GAP_corrected': corrected_gap_CN,
+                    'y_pred_corrected': y_pred_corrected_CN_test,
+                    'GAP': gap_CN_test,
+                    'GAP_corrected': corrected_gap_CN_test,
                     'ID-unique': id_test_kf_CN
                 })
-                results_labels_df_CN = pd.concat([results_labels_df_CN, temp_CN_df], ignore_index=True)
+                temp_CN_df_train = pd.DataFrame({                    
+                    'y_labels': y_train_kf_CN,
+                    'y_pred': y_pred_CN_train,
+                    'y_pred_corrected': y_pred_corrected_CN_train,
+                    'GAP': gap_CN_train,
+                    'GAP_corrected': corrected_gap_CN_train,
+                    'ID-unique': id_train_kf_CN
+                })
+
+                results_labels_df_CN_train = pd.concat([results_labels_df_CN_train, temp_CN_df_train], ignore_index=True)
+                results_per_fold_CN_train[i][fold] = temp_CN_df_train.copy()
+                results_labels_df_CN_test = pd.concat([results_labels_df_CN_test, temp_CN_df_test], ignore_index=True)
+                results_per_fold_CN_test[i][fold] = temp_CN_df_test.copy()
 
                 # Procesar cada dataframe de pacientes si lista_dfs no es None
                 if lista_dfs is not None:
@@ -191,11 +224,18 @@ class BaseRegressor:
                             'ID-unique': id_test_pat
                         })
                         results_labels_list[j] = pd.concat([results_labels_list[j], temp_pat_df], ignore_index=True)
+                        results_per_fold_pat[j][i][fold] = temp_pat_df.copy()  # Guardar en el diccionario del fold de cada paciente
 
                 # Guardar el modelo entrenado
                 results['model'].append(model)
+                results['mean_X_train_kf'].append(mean_X_train_kf)
+                results['std_X_train_kf'].append(std_X_train_kf)
+                results['slope'].append(slope)
+                results['intercept'].append(intercept)
 
-        return results_labels_df_CN, results_labels_list, results
+        return results_labels_df_CN_train, results_labels_df_CN_test, results_labels_list, results, results_per_fold_CN_train,results_per_fold_CN_test, results_per_fold_pat
+
+
 
 
     def avg_list(self, df_list):
