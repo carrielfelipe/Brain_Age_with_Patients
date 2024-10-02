@@ -4,16 +4,16 @@
 
 | Algoritmo        | Tuning | Training | SHAP |
 |------------------|--------|----------|------|
-| BaggedKNN        | [ ]    | [ ]      | [ ]  |
+| BaggedKNN        | [x]    | [x]      | [x]  |
 | CatBoost         | [ ]    | [ ]      | [ ]  |
-| ElasticNet       | [ ]    | [ ]      | [ ]  |
-| Kernel Ridge     | [ ]    | [ ]      | [ ]  |
-| KNN              | [ ]    | [ ]      | [ ]  |
-| Lasso            | [ ]    | [ ]      | [ ]  |
+| ElasticNet       | [x]    | [x]      | [x]  |
+| Kernel Ridge     | [x]    | [x]      | [ ]  |
+| KNN              | [x]    | [x]      | [ ]  |
+| Lasso            | [x]    | [x]      | [x]  |
 | MLP              | [ ]    | [ ]      | [ ]  |
-| Random Forest    | [ ]    | [ ]      | [ ]  |
-| SVR              | [ ]    | [ ]      | [ ]  |
-| XGBoost          | [ ]    | [ ]      | [ ]  |
+| Random Forest    | [x]    | [x]      | [ ]  |
+| SVR              | [x]    | [x]      | [ ]  |
+| XGBoost          | [x]    | [x]      | [ ]  |
 
 ### Etapas
 
