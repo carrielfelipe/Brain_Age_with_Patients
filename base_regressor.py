@@ -57,7 +57,7 @@ class BaseRegressor:
             X_scaled = X
         self.X_train, self.X_test, self.y_train, self.y_test = train_test_split(X_scaled, y, test_size=0.2, random_state=1)
            
-    def search_best_model(self,  X=None, y=None, param_space_=None, n_iter_=10, n_jobs_=-1, scoring_metric='neg_mean_absolute_error'):
+    def search_best_model(self,  X=None, y=None, param_space_=None, n_iter_=10, n_jobs_=-1, scoring_metric='neg_mean_absolute_error', type_model=1):
        
         if X is None:
             X = self.X_train
@@ -72,6 +72,11 @@ class BaseRegressor:
         n_splits = 10
         kf = KFold(n_splits=n_splits, shuffle=True, random_state=126)       
         
+        if type_model == 1:
+            model = self.model_ml(**self.model_params_search)
+        if type_model == 2:
+            model = self.model_ml 
+
         self.opt_model = BayesSearchCV(
             estimator=self.model_ml(**self.model_params_search),
             search_spaces=param_space,
@@ -89,7 +94,7 @@ class BaseRegressor:
         return self.opt_model, best_params_return
     
     
-    def trainer(self, df_concatenado_CN, lista_dfs=None, n_splits=10, n_iterations=20, params_=None):
+    def trainer(self, df_concatenado_CN, lista_dfs=None, n_splits=10, n_iterations=20, params_=None, type_model=1):
     
         if params_ is None:
             params = self.params
@@ -154,7 +159,10 @@ class BaseRegressor:
                 X_test_kf_CN_scaled = (X_test_kf_CN - mean_X_train_kf) / std_X_train_kf
 
                 # Entrenar el modelo con CN
-                model = self.model_ml(**params, **self.model_params_train)
+                if type_model == 1:
+                    model = self.model_ml(**params, **self.model_params_train)
+                if type_model == 2:
+                    model = self.model_ml 
                 model.fit(X_train_kf_CN_scaled, y_train_kf_CN)
 
                 y_pred_CN_train = model.predict(X_train_kf_CN_scaled)
