@@ -2,18 +2,18 @@
 
 ## Estado de Progreso
 
-| Algoritmo        | Tuning | Training | SHAP |
-|------------------|--------|----------|------|
-| BaggedKNN        | [x]    | [x]      | [x]  |
-| CatBoost         | [ ]    | [ ]      | [ ]  |
-| ElasticNet       | [x]    | [x]      | [x]  |
-| Kernel Ridge     | [x]    | [x]      | [ ]  |
-| KNN              | [x]    | [x]      | [ ]  |
-| Lasso            | [x]    | [x]      | [x]  |
-| MLP              | [ ]    | [ ]      | [ ]  |
-| Random Forest    | [x]    | [x]      | [ ]  |
-| SVR              | [x]    | [x]      | [ ]  |
-| XGBoost          | [x]    | [x]      | [ ]  |
+| Algoritmo        | Tuning | Training | SHAP | Associations |
+|------------------|--------|----------|------|--------------|
+| BaggedKNN        | [x]    | [x]      | [x]  | [x]          |
+| CatBoost         | [ ]    | [ ]      | [ ]  | [ ]          |
+| ElasticNet       | [x]    | [x]      | [x]  | [x]          |
+| Kernel Ridge     | [x]    | [x]      | [ ]  | [x]          |
+| KNN              | [x]    | [x]      | [ ]  | [x]          |
+| Lasso            | [x]    | [x]      | [x]  | [x]          |
+| MLP              | [ ]    | [ ]      | [ ]  | [ ]          |
+| Random Forest    | [x]    | [x]      | [ ]  | [ ]          |
+| SVR              | [x]    | [x]      | [ ]  | [x]          |
+| XGBoost          | [x]    | [x]      | [ ]  | [ ]          |
 
 ### Etapas
 
