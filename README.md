@@ -11,7 +11,7 @@
 | KNN              | [x]    | [x]      | [ ]  | [x]          |
 | Lasso            | [x]    | [x]      | [x]  | [x]          |
 | MLP              | [ ]    | [ ]      | [ ]  | [ ]          |
-| Random Forest    | [x]    | [x]      | [ ]  | [ ]          |
+| Random Forest    | [x]    | [x]      | [x]  | [x]          |
 | SVR              | [x]    | [x]      | [ ]  | [x]          |
 | XGBoost          | [x]    | [x]      | [ ]  | [ ]          |
 
