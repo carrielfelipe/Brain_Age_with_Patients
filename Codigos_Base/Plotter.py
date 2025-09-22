@@ -618,3 +618,208 @@ class Plotter:
 
         # Mostrar el gráfico
         plt.show()
+
+
+
+
+
+
+
+######### Plots de Clasificacioon
+
+    def graph_roc(self, metrics_, title='', treshold= 0.75, individual=True,avg=True, color_avg='#F24405'):
+        """
+        Genera un gráfico ROC con las métricas almacenadas en metrics_.
+        """
+        # Inicializar valores promedio
+        metric_tpr_mean = np.zeros(100)
+        auc_values = []
+        acc_list, prec_list, f1_list, rec_list = [], [], [], []
+        plt.figure(figsize=(4, 4))
+
+
+        # Iterar sobre las métricas por fold
+        for fold, auc_roc in enumerate(metrics_["AUC"]):
+            if auc_roc < treshold:  # Umbral para ignorar curvas con AUC < 0.75
+                continue
+
+            # Interpolación de TPR y cálculo de AUC
+            tpr = np.interp(np.linspace(0, 1, 100), metrics_["FPR"][fold], metrics_["TPR"][fold])
+            metric_tpr_mean += tpr
+            auc_values.append(auc_roc)
+
+            if individual:
+
+                # Graficar cada curva individual
+                plt.plot(
+                    np.linspace(0, 1, 100), tpr,
+                    color='#747E7E', alpha=0.5, lw=0.7,
+                    label=None if len(metrics_["AUC"]) > 1 else f'AUC = {auc_roc:.2f}'
+                )
+
+            # Agregar métricas de evaluación por fold
+            acc_list.append(metrics_["Accuracy"][fold])
+            prec_list.append(metrics_["Precision"][fold])
+            f1_list.append(metrics_["F1 Score"][fold])
+            rec_list.append(metrics_["Recall"][fold])
+
+        if avg:
+            # Graficar la curva promedio si hay suficientes curvas válidas
+            if auc_values:
+                metric_tpr_mean /= len(auc_values)
+                plt.plot(
+                    np.linspace(0, 1, 100), metric_tpr_mean,
+                    color=color_avg, lw=2, alpha=0.8,
+                    label=f'(AUC = {np.mean(auc_values):.2f} ± {np.std(auc_values):.2f})'
+                )
+
+        # Línea de referencia
+        plt.plot([0, 1], [0, 1], 'k--', lw=1.5)
+
+        # Configuración de los ejes
+        plt.xlim([0.0, 1.0])
+        plt.ylim([0.0, 1.0])
+        plt.xlabel('False Positive Rate', fontsize=12)
+        plt.ylabel('True Positive Rate', fontsize=12)
+
+        # Título con métricas promedio
+        plt.title(
+            f'ROC Curve {title}\n'
+            f'Acc={np.mean(acc_list):.2f} Prec={np.mean(prec_list):.2f} '
+            f'F1={np.mean(f1_list):.2f} Rec={np.mean(rec_list):.2f}',
+            fontsize=14
+        )
+
+        # Leyenda y mostrar gráfico
+        plt.legend(loc="lower right", fontsize=10)
+        #plt.grid(False, linestyle='--', alpha=0.6)
+        plt.tight_layout()
+        plt.show()
+
+
+
+
+
+    def plot_f_scores(self, f_scores, f_score_std, classes, colors=None,x_size=4,y_size=4):
+                
+        if colors is None:
+            # Si no se pasan colores, usar colores predeterminados (uno para cada barra)
+            colors = ['lightblue'] * len(f_scores)
+        
+        # Ordenar las barras de mayor a menor
+        sorted_indices = np.argsort(f_scores)[::-1]  # Ordenar de mayor a menor
+        f_scores = np.array(f_scores)[sorted_indices]
+        f_score_std = np.array(f_score_std)[sorted_indices]
+        classes = np.array(classes)[sorted_indices]
+        colors = np.array(colors)[sorted_indices] if len(colors) == len(f_scores) else ['lightblue'] * len(f_scores)
+        
+        # Configuración de la figura
+        fig, ax = plt.subplots(figsize=(x_size, y_size))
+        
+        # Crear las barras horizontales con error, asignando un color por cada barra
+        bars = ax.barh(classes, f_scores, xerr=f_score_std, color=colors, edgecolor='black', capsize=5)
+        
+        # Etiquetas y título
+        ax.set_xlabel('F-score')
+        ax.set_title('F-scores con Desviación Estándar')
+        
+        # Invertir el eje Y para que la barra con el valor más alto quede en la parte superior
+        ax.invert_yaxis()
+        
+        # Mostrar el gráfico
+        plt.show()
+
+
+
+
+
+    def C_Matrix_(self, metrics_, title='', threshold=0.75, individual=True, avg=True, color_avg='#F24405', classes=[], colors=[]):
+        temp_matrix = []
+
+        # Recorre los 200 modelos
+        for i in range(len(metrics_['AUC'])):
+            if metrics_["AUC"][i] < threshold:  # Umbral para ignorar curvas con AUC < 0.75
+                continue
+            temp_matrix.append(metrics_["Confusion Matrix"][i])
+
+        avg_conf_matrix = np.mean(np.array(temp_matrix), axis=0)
+        classes_ = classes = ['Low', 'High']
+
+        # Crear la figura
+        plt.figure(figsize=(4, 3))
+        sns.heatmap(avg_conf_matrix, annot=True, fmt='.2f', cmap='Greys', 
+                    cbar=True, linecolor='black', linewidths=1,
+                    xticklabels=classes_, yticklabels=classes,
+                    cbar_kws={'label': ''})
+        
+        plt.xlabel('Prediction')
+        plt.ylabel('True')
+        plt.title('Confusion Matrix')
+        plt.show()
+
+
+
+
+
+
+    def C_Matrix(self, metrics_, title='', threshold=0.75, individual=True, avg=True, color_avg='#F24405', classes=[], colors=[]):
+        temp_matrix = []
+
+        # Recorre los 200 modelos
+        for i in range(len(metrics_['AUC'])):
+            if metrics_["AUC"][i] < threshold:  # Umbral para ignorar curvas con AUC < 0.75
+                continue
+            temp_matrix.append(metrics_["Confusion Matrix"][i])
+
+        avg_conf_matrix = np.mean(np.array(temp_matrix), axis=0)
+        std_conf_matrix = np.std(temp_matrix, axis=0)
+
+        # Cálculo de porcentajes sobre la matriz promedio
+        total = np.sum(avg_conf_matrix)
+        if total > 0:
+            percent_conf_matrix = (avg_conf_matrix / total) * 100
+        else:
+            percent_conf_matrix = np.zeros_like(avg_conf_matrix)
+
+        classes_ = classes = ['Low', 'High']
+
+        # Crear la figura
+        plt.figure(figsize=(4, 3))
+
+        # Crear un arreglo vacío para los textos dentro de cada celda
+        text_matrix = np.empty(avg_conf_matrix.shape, dtype=object)
+
+        # Llenar el arreglo de texto con los valores correspondientes
+        for i in range(len(avg_conf_matrix)):
+            for j in range(len(avg_conf_matrix[i])):
+                text_matrix[i, j] = f"{avg_conf_matrix[i, j]:.2f}\n({percent_conf_matrix[i, j]:.1f}%)\n({std_conf_matrix[i, j]:.2f})"
+
+        # Graficar el heatmap con los valores combinados
+        # Graficar el heatmap con los valores basados en porcentaje
+        sns.heatmap(percent_conf_matrix, annot=text_matrix, fmt='', cmap='Greys', 
+                    cbar=True, linecolor='black', linewidths=1,
+                    xticklabels=classes_, yticklabels=classes,
+                    cbar_kws={'label': '%'})
+        plt.xlabel('Prediction')
+        plt.ylabel('True')
+        plt.title('Confusion Matrix')
+        plt.show()
+
+
+
+
+    def plot_metrics_clf(self,metrics_df):
+        plt.figure(figsize=(5, 3))
+        sns.boxplot(data=metrics_df, orient="h", palette="Set2")
+        sns.stripplot(data=metrics_df, orient="h", color="black", alpha=0.5, jitter=True)
+
+        # Añadir detalles al gráfico
+        plt.title("Resultados de Métricas por Fold", fontsize=16)
+        plt.xlabel("Valor de la Métrica", fontsize=12)
+        plt.ylabel("Métrica", fontsize=12)
+        plt.grid(axis="x", linestyle="--", alpha=0.7)
+        plt.tight_layout()
+
+        # Mostrar el gráfico
+        plt.show()
+

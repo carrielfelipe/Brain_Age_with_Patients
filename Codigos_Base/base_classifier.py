@@ -19,6 +19,7 @@ import statsmodels.api as sm
 from sklearn.model_selection import StratifiedShuffleSplit
 
 from scipy.stats import linregress
+from sklearn.metrics import roc_curve, auc, f1_score, accuracy_score, recall_score, precision_score, confusion_matrix
 
 
 class BaseClassifier:
@@ -52,7 +53,7 @@ class BaseClassifier:
         self.residual_model = None
 
 
-    def search_best_model(self,  X=None, y=None, param_space_=None, n_iter_=10, n_jobs_=-1, scoring_metric='accuracy', type_model=1):
+    def search_best_model(self,  X=None, y=None, param_space_=None, n_iter_=10, n_jobs_=-1, scoring_metric='accuracy', type_model=1,n_splits = 10):
        
         if X is None:
             X = self.X_train
@@ -64,7 +65,7 @@ class BaseClassifier:
         else:
             param_space = param_space_
 
-        n_splits = 10
+        
         kf = KFold(n_splits=n_splits, shuffle=True, random_state=126)       
         
         if type_model == 1:
@@ -89,25 +90,22 @@ class BaseClassifier:
         return opt_model, best_params_return
     
 
-    def trainer(self, df, n_splits=10, n_iterations=20, params_=None, type_model=1, scaler=2, early_stop=False, id='ID-unique-2'):
+    def trainer(self, X, y, ID, ID_label, n_splits=10, n_iterations=20, params_=None, type_model=1, scaler=2, early_stopping_rounds=None):
         
         if params_ is None:
             params = self.params
         else:
-            params = params_
-
-
-        
+            params = params_        
         
         # Preparar el dataframe de controles
-        X = df.iloc[:, :-2]  # Features
-        y = df.iloc[:, -2]   # Labels (Age)
-        ID = df.iloc[:, -1]  # IDs
+        #X = df.iloc[:, :-2]  # Features
+        #y = df.iloc[:, -2]   # Labels (Age)
+        #ID = df.iloc[:, -1]  # IDs
         results_per_fold_train = []
         results_per_fold_test = []
                 
-        results_labels_df_train = pd.DataFrame(columns=['y_labels','y_pred','y_prob', id])
-        results_labels_df_test = pd.DataFrame(columns=['y_labels', 'y_pred','y_prob', id])
+        results_labels_df_train = pd.DataFrame(columns=['y_labels','y_pred','y_prob', ID_label])
+        results_labels_df_test = pd.DataFrame(columns=['y_labels', 'y_pred','y_prob', ID_label])
 
         # Inicializar resultados
         results = {'model': [],
@@ -128,8 +126,8 @@ class BaseClassifier:
             for fold in range(n_splits):
                 # Obtener índices de entrenamiento y prueba para CN
                 train_index, test_index = kf_splits[fold]
-                X_train_kf, X_test_kf_CN = X.iloc[train_index], X.iloc[test_index]
-                y_train_kf, y_test_kf_CN = y.iloc[train_index], y.iloc[test_index]
+                X_train_kf, X_test_kf = X.iloc[train_index], X.iloc[test_index]
+                y_train_kf, y_test_kf = y.iloc[train_index], y.iloc[test_index]
                 id_train_kf = ID.iloc[train_index]
                 id_test_kf = ID.iloc[test_index]
 
@@ -142,18 +140,18 @@ class BaseClassifier:
                 if scaler == 1:
                     # No escalar
                     X_train_kf_scaled = X_train_kf
-                    X_test_kf_scaled = X_test_kf_CN
+                    X_test_kf_scaled = X_test_kf
                 elif scaler == 2:
                     # Z-score scaling                    
                     X_train_kf_scaled = (X_train_kf - mean_X_train_kf) / std_X_train_kf
-                    X_test_kf_scaled = (X_test_kf_CN - mean_X_train_kf) / std_X_train_kf
+                    X_test_kf_scaled = (X_test_kf - mean_X_train_kf) / std_X_train_kf
                 elif scaler == 3:
                     # MinMax scaling (manual)                    
                     X_train_kf_scaled = (X_train_kf - min_X_train_kf) / (max_X_train_kf - min_X_train_kf)
-                    X_test_kf_scaled = (X_test_kf_CN - min_X_train_kf) / (max_X_train_kf - min_X_train_kf)
+                    X_test_kf_scaled = (X_test_kf - min_X_train_kf) / (max_X_train_kf - min_X_train_kf)
 
-                self.x_train_kf = X_train_kf_scaled
-                self.y_train_kf=y_train_kf
+                #x_train_kf = X_train_kf_scaled
+                #y_train_kf=y_train_kf
 
 
                 # Entrenar el modelo con CN
@@ -162,42 +160,43 @@ class BaseClassifier:
                 if type_model == 2:
                     model = self.model_ml
 
-                if early_stop:
-                    self.fit_params_train = {
-                    "early_stopping_rounds": self.early_stopping_rounds,
+                if early_stopping_rounds:
+                    fit_params_train = {
+                    "early_stopping_rounds": early_stopping_rounds,
                     "eval_set": "mae",
-                    "eval_set": self.get_eval_set(),
+                    #"eval_set": self.get_eval_set(),
+                    "eval_set": [(X_test_kf_scaled, y_test_kf)],
                     "verbose": False
                     }
 
                     
                 model.fit(X_train_kf_scaled, y_train_kf,**self.fit_params_train)
 
-                y_pred_CN_train = model.predict(X_train_kf_scaled)
-                y_prob_CN_train = model.predict_proba(X_train_kf_scaled)[:, 1]
+                y_pred_train = model.predict(X_train_kf_scaled)
+                y_prob_train = model.predict_proba(X_train_kf_scaled)[:, 1]
 
                 # Hacer predicciones para el conjunto de prueba de CN
-                y_pred_CN_test = model.predict(X_test_kf_scaled)
-                y_prob_CN_test = model.predict_proba(X_test_kf_scaled)[:, 1]
+                y_pred_test = model.predict(X_test_kf_scaled)
+                y_prob_test = model.predict_proba(X_test_kf_scaled)[:, 1]
                 
                 # Guardar resultados de CN 
-                temp_CN_df_test = pd.DataFrame({
-                    'y_labels': y_test_kf_CN,
-                    'y_pred': y_pred_CN_test,
-                    'y_prob':y_prob_CN_test,                    
-                    id: id_test_kf
+                temp_df_test = pd.DataFrame({
+                    'y_labels': y_test_kf,
+                    'y_pred': y_pred_test,
+                    'y_prob':y_prob_test,                    
+                    ID_label: id_test_kf
                 })
-                temp_CN_df_train = pd.DataFrame({                    
+                temp_df_train = pd.DataFrame({                    
                     'y_labels': y_train_kf,
-                    'y_pred': y_pred_CN_train, 
-                    'y_prob':y_prob_CN_train  ,                 
-                    id: id_train_kf
+                    'y_pred': y_pred_train, 
+                    'y_prob':y_prob_train,                 
+                    ID_label: id_train_kf
                 })
 
-                results_labels_df_train = pd.concat([results_labels_df_train, temp_CN_df_train], ignore_index=True)
-                results_per_fold_train.append(temp_CN_df_train.copy())
-                results_labels_df_test = pd.concat([results_labels_df_test, temp_CN_df_test], ignore_index=True)
-                results_per_fold_test.append(temp_CN_df_test.copy())
+                results_labels_df_train = pd.concat([results_labels_df_train, temp_df_train], ignore_index=True)
+                results_per_fold_train.append(temp_df_train.copy())
+                results_labels_df_test = pd.concat([results_labels_df_test, temp_df_test], ignore_index=True)
+                results_per_fold_test.append(temp_df_test.copy())
 
                 # Procesar cada dataframe de pacientes si lista_dfs no es None
                 
@@ -274,3 +273,56 @@ class BaseClassifier:
             }).reset_index()
             results_avg.append(df_avg)
         return results_avg
+
+
+
+    def clf_metrics(self, y_true, y_pred, y_prob):
+        # Calcular métricas de clasificación
+        fpr, tpr, thresholds = roc_curve(y_true, y_prob)
+        return {
+            "AUC": auc(fpr, tpr),
+            "FPR": fpr,
+            "TPR": tpr,
+            "Thresholds": thresholds,
+            "F1 Score": f1_score(y_true, y_pred),
+            "Accuracy": accuracy_score(y_true, y_pred),
+            "Recall": recall_score(y_true, y_pred),
+            "Precision": precision_score(y_true, y_pred),
+            "Confusion Matrix": confusion_matrix(y_true, y_pred),
+        }
+
+
+    def calculate_f_scores(self, metrics_, results_model, threshold=0.75):
+        f_scores_all = []
+
+        # Lista para almacenar todas las clases únicas
+        all_classes = set()
+
+        for i in range(len(metrics_['AUC'])):
+            if metrics_["AUC"][i] < threshold:  # Ignorar modelos con AUC < threshold
+                continue
+
+            # Obtén los F-scores del modelo i
+            f_scores = results_model['model'][i].get_booster().get_score()
+            f_scores_all.append(list(f_scores.values()))
+
+            # Agrega las clases de este modelo al conjunto de clases únicas
+            all_classes.update(f_scores.keys())
+
+        if not f_scores_all:  # Si no hay modelos que cumplan el umbral, retorna vacíos
+            print("No se encontraron modelos con AUC por encima del umbral.")
+            return [], [], []
+
+        # Asegúrate de que todas las listas tengan la misma longitud
+        max_length = max(len(lst) for lst in f_scores_all)
+        f_scores_all_padded = [lst + [0] * (max_length - len(lst)) for lst in f_scores_all]
+
+        # Calcula promedio y desviación estándar
+        f_scores_array = np.array(f_scores_all_padded)
+        f_scores_avg = np.mean(f_scores_array, axis=0)
+        f_scores_std = np.std(f_scores_array, axis=0)
+
+        # Convierte las clases únicas en una lista ordenada
+        #classes = sorted(all_classes)
+        classes = list((f_scores.keys()))
+        return list(f_scores_avg), list(f_scores_std), classes

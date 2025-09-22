@@ -97,87 +97,62 @@ class BaseRegressor:
 
         return self.opt_model, best_params_return
     
-    def get_eval_set(self):
-        """Retorna el conjunto de evaluación actual."""
-        return [(self.x_train_kf, self.y_train_kf)]
-    
-    def trainer(self, df_CN, df_patient=None, n_splits=10, n_iterations=20, params_=None, type_model=1, scaler=2, early_stopping_rounds=None):
-    
+     
+    def trainer(self, X, y, ID, ID_label, n_splits=10, n_iterations=20, params_=None, type_model=1, scaler=2, early_stopping_rounds=None):
+        
         if params_ is None:
             params = self.params
         else:
             params = params_
-        
-        # Preparar el dataframe de controles
-        X_CN = df_CN.iloc[:, :-2]  # Features
-        y_CN = df_CN.iloc[:, -2]   # Labels (Age)
-        ID_CN = df_CN.iloc[:, -1]  # IDs
-        results_per_fold_CN_train = []
-        results_per_fold_CN_test = []
 
+        # Preparar el dataframe de controles        
+        results_per_fold_train = []
+        results_per_fold_test = []
         # Inicializar resultados
-        results = {'model': [],
-                   'mean_X_train_kf':[],
-                   'std_X_train_kf':[],
-                   'min_X_train_kf':[],
-                   'max_X_train_kf':[],
-                   'slope': [],
-                   'intercept': [],
-                   }
-        
-        results_labels_df_CN_train = pd.DataFrame(columns=['y_labels','y_pred','y_pred_corrected','GAP', 'GAP_corrected', 'ID-unique'])
-        results_labels_df_CN_test = pd.DataFrame(columns=['y_labels', 'y_pred', 'y_pred_corrected', 'GAP', 'GAP_corrected', 'ID-unique'])
+        results = {
+            'model': [],
+            'mean_X_train_kf': [],
+            'std_X_train_kf': [],
+            'min_X_train_kf': [],
+            'max_X_train_kf': [],
+            'slope': [],
+            'intercept': []
+        }
 
-        if df_patient is not None:
-            results_per_fold_patient = [[] for _ in df_patient]
-        else:
-            results_per_fold_patient = []
+        results_labels_df_train = pd.DataFrame(columns=['y_labels', 'y_pred', 'y_pred_corrected', 'GAP', 'GAP_corrected', ID_label])
+        results_labels_df_test = pd.DataFrame(columns=['y_labels', 'y_pred', 'y_pred_corrected', 'GAP', 'GAP_corrected', ID_label])
 
-        results_labels_patient = []
-
-        # Inicializar resultados por fold para pacientes
-        # Si lista_dfs no es None, crear dataframes para almacenar resultados de pacientes
-        if df_patient is not None:
-            for _ in df_patient:
-                results_labels_patient.append(pd.DataFrame(columns=['y_labels', 'y_pred', 'y_pred_corrected', 'GAP', 'GAP_corrected','ID-unique']))
-                #results_per_fold_pat.append({})  # Diccionario por cada grupo de pacientes
-        
-        # Bucle de iteraciones
         for i in range(n_iterations):
             # Crear validación cruzada para CN
-            kf_CN = KFold(n_splits=n_splits, shuffle=True, random_state=i)
-            kf_CN_splits = list(kf_CN.split(X_CN, y_CN))
-
-            # Crear validación cruzada para cada dataframe de pacientes si lista_dfs no es None
-            if df_patient is not None:
-                kf_splits_list = [list(KFold(n_splits=n_splits, shuffle=True, random_state=i).split(df.iloc[:, :-2], df.iloc[:, -2])) for df in df_patient]
+            kf = KFold(n_splits=n_splits, shuffle=True, random_state=i)
+            kf_splits = list(kf.split(X, y))
 
             for fold in range(n_splits):
                 # Obtener índices de entrenamiento y prueba para CN
-                train_index_CN, test_index_CN = kf_CN_splits[fold]
-                X_train_kf_CN, X_test_kf_CN = X_CN.iloc[train_index_CN], X_CN.iloc[test_index_CN]
-                y_train_kf_CN, y_test_kf_CN = y_CN.iloc[train_index_CN], y_CN.iloc[test_index_CN]
-                id_train_kf_CN = ID_CN.iloc[train_index_CN]
-                id_test_kf_CN = ID_CN.iloc[test_index_CN]
+                train_index, test_index = kf_splits[fold]
+                X_train_kf, X_test_kf = X.iloc[train_index], X.iloc[test_index]
+                y_train_kf, y_test_kf = y.iloc[train_index], y.iloc[test_index]
+                id_train_kf = ID.iloc[train_index]
+                id_test_kf = ID.iloc[test_index]
 
-                mean_X_train_kf = X_train_kf_CN.mean()
-                std_X_train_kf = X_train_kf_CN.std()
-                min_X_train_kf = X_train_kf_CN.min()
-                max_X_train_kf = X_train_kf_CN.max()
+                mean_X_train_kf = X_train_kf.mean()
+                std_X_train_kf = X_train_kf.std()
+                min_X_train_kf = X_train_kf.min()
+                max_X_train_kf = X_train_kf.max()
 
                 # Escalar los datos de acuerdo con el parámetro scaler
                 if scaler == 1:
                     # No escalar
-                    X_train_kf_CN_scaled = X_train_kf_CN
-                    X_test_kf_CN_scaled = X_test_kf_CN
+                    X_train_kf_scaled = X_train_kf
+                    X_test_kf_scaled = X_test_kf
                 elif scaler == 2:
                     # Z-score scaling                    
-                    X_train_kf_CN_scaled = (X_train_kf_CN - mean_X_train_kf) / std_X_train_kf
-                    X_test_kf_CN_scaled = (X_test_kf_CN - mean_X_train_kf) / std_X_train_kf
+                    X_train_kf_scaled = (X_train_kf - mean_X_train_kf) / std_X_train_kf
+                    X_test_kf_scaled = (X_test_kf - mean_X_train_kf) / std_X_train_kf
                 elif scaler == 3:
                     # MinMax scaling (manual)                    
-                    X_train_kf_CN_scaled = (X_train_kf_CN - min_X_train_kf) / (max_X_train_kf - min_X_train_kf)
-                    X_test_kf_CN_scaled = (X_test_kf_CN - min_X_train_kf) / (max_X_train_kf - min_X_train_kf)         
+                    X_train_kf_scaled = (X_train_kf - min_X_train_kf) / (max_X_train_kf - min_X_train_kf)
+                    X_test_kf_scaled = (X_test_kf - min_X_train_kf) / (max_X_train_kf - min_X_train_kf)         
 
                 # Entrenar el modelo con CN
                 if type_model == 1:
@@ -190,81 +165,49 @@ class BaseRegressor:
                     "early_stopping_rounds": early_stopping_rounds,
                     "eval_set": "mae",
                     #"eval_set": self.get_eval_set(),
-                    "eval_set": [(X_test_kf_CN_scaled, y_test_kf_CN)],
+                    "eval_set": [(X_test_kf_scaled, y_test_kf)],
                     "verbose": False
                     }
 
                     
-                model.fit(X_train_kf_CN_scaled, y_train_kf_CN,**self.fit_params_train)
+                model.fit(X_train_kf_scaled, y_train_kf,**self.fit_params_train)
 
-                y_pred_CN_train = model.predict(X_train_kf_CN_scaled)
-                gap_CN_train = y_pred_CN_train - y_train_kf_CN
+                y_pred_train = model.predict(X_train_kf_scaled)
+                gap_train = y_pred_train - y_train_kf
 
-                # Hacer predicciones para el conjunto de prueba de CN
-                y_pred_CN_test = model.predict(X_test_kf_CN_scaled)
-                gap_CN_test = y_pred_CN_test - y_test_kf_CN
+            
+                y_pred_test = model.predict(X_test_kf_scaled)
+                gap_CN_test = y_pred_test - y_test_kf
 
                 # Ajuste de GAP para CN
-                slope, intercept, _, _, _ = linregress(y_train_kf_CN, gap_CN_train)
-                corrected_gap_CN_train = gap_CN_train - (slope * y_train_kf_CN + intercept)
-                corrected_gap_CN_test = gap_CN_test - (slope * y_test_kf_CN + intercept)
-                y_pred_corrected_CN_test = y_pred_CN_test - (slope * y_test_kf_CN + intercept)
-                y_pred_corrected_CN_train = y_pred_CN_train - (slope * y_train_kf_CN + intercept)
+                slope, intercept, _, _, _ = linregress(y_train_kf, gap_train)
+                corrected_gap_train = gap_train - (slope * y_train_kf + intercept)
+                corrected_gap_test = gap_CN_test - (slope * y_test_kf + intercept)
+                y_pred_corrected_test = y_pred_test - (slope * y_test_kf + intercept)
+                y_pred_corrected_CN_train = y_pred_train - (slope * y_train_kf + intercept)
 
                 # Guardar resultados de CN 
-                temp_CN_df_test = pd.DataFrame({
-                    'y_labels': y_test_kf_CN,
-                    'y_pred': y_pred_CN_test,
-                    'y_pred_corrected': y_pred_corrected_CN_test,
+                temp_df_test = pd.DataFrame({
+                    'y_labels': y_test_kf,
+                    'y_pred': y_pred_test,
+                    'y_pred_corrected': y_pred_corrected_test,
                     'GAP': gap_CN_test,
-                    'GAP_corrected': corrected_gap_CN_test,
-                    'ID-unique': id_test_kf_CN
+                    'GAP_corrected': corrected_gap_test,
+                    ID_label: id_test_kf
                 })
-                temp_CN_df_train = pd.DataFrame({                    
-                    'y_labels': y_train_kf_CN,
-                    'y_pred': y_pred_CN_train,
+                temp_df_train = pd.DataFrame({                    
+                    'y_labels': y_train_kf,
+                    'y_pred': y_pred_train,
                     'y_pred_corrected': y_pred_corrected_CN_train,
-                    'GAP': gap_CN_train,
-                    'GAP_corrected': corrected_gap_CN_train,
-                    'ID-unique': id_train_kf_CN
+                    'GAP': gap_train,
+                    'GAP_corrected': corrected_gap_train,
+                    ID_label: id_train_kf
                 })
 
-                results_labels_df_CN_train = pd.concat([results_labels_df_CN_train, temp_CN_df_train], ignore_index=True)
-                results_per_fold_CN_train.append(temp_CN_df_train.copy())
-                results_labels_df_CN_test = pd.concat([results_labels_df_CN_test, temp_CN_df_test], ignore_index=True)
-                results_per_fold_CN_test.append(temp_CN_df_test.copy())
-
-                # Procesar cada dataframe de pacientes si lista_dfs no es None
-                if df_patient is not None:
-                    for j, df in enumerate(df_patient):
-                        train_index_pat, test_index_pat = kf_splits_list[j][fold]
-                        X_train_pat = df.iloc[train_index_pat, :-2]
-                        X_test_pat = df.iloc[test_index_pat, :-2]
-                        y_test_pat = df.iloc[test_index_pat, -2]
-                        id_test_pat = df.iloc[test_index_pat, -1]
-
-                        # Escalar usando los parámetros de CN
-                        X_test_pat_scaled = (X_test_pat - mean_X_train_kf) / std_X_train_kf
-
-                        # Predicciones para el grupo de pacientes
-                        y_pred_pat_test = model.predict(X_test_pat_scaled)
-                        gap_pat = y_pred_pat_test - y_test_pat
-
-                        # Ajuste de GAP para los pacientes
-                        corrected_gap_pat = gap_pat - (slope * y_test_pat + intercept)
-                        y_pred_corrected_pat = y_pred_pat_test - (slope * y_test_pat + intercept)
-
-                        # Guardar resultados para cada grupo de pacientes
-                        temp_pat_df = pd.DataFrame({
-                            'y_labels': y_test_pat,
-                            'y_pred': y_pred_pat_test,
-                            'y_pred_corrected': y_pred_corrected_pat,
-                            'GAP': gap_pat,
-                            'GAP_corrected': corrected_gap_pat,
-                            'ID-unique': id_test_pat
-                        })
-                        results_labels_patient[j] = pd.concat([results_labels_patient[j], temp_pat_df], ignore_index=True)
-                        results_per_fold_patient[j].append(temp_pat_df.copy())  # Guardar en la lista simple
+                results_labels_df_train = pd.concat([results_labels_df_train, temp_df_train], ignore_index=True)
+                results_per_fold_train.append(temp_df_train.copy())
+                results_labels_df_test = pd.concat([results_labels_df_test, temp_df_test], ignore_index=True)
+                results_per_fold_test.append(temp_df_test.copy())
 
                 # Guardar el modelo entrenado
                 results['model'].append(model)
@@ -278,49 +221,94 @@ class BaseRegressor:
                 results['slope'].append(slope)
                 results['intercept'].append(intercept)
 
-        return results_labels_df_CN_train, results_labels_df_CN_test, results_labels_patient, results, results_per_fold_CN_train,results_per_fold_CN_test, results_per_fold_patient
+                
 
-
-    def test(self):
-        pass
-
-    def avg_list(self, df_list):
-        results_avg = []
-        for df in df_list:            
-            df_avg = df.groupby('ID-unique').agg({
+        df_avg_train = results_labels_df_train.groupby(ID_label).agg({
                 'y_labels': 'mean',
                 'y_pred': 'mean',
                 'y_pred_corrected': 'mean',
                 'GAP': 'mean',
                 'GAP_corrected': 'mean'
             }).reset_index()
-            results_avg.append(df_avg)
-        return results_avg
-
         
-    def predicter(self, X_test=None):
-        if X_test is None:
-            X_test = self.X_test
-        y_pred = self.model.predict(X_test)
-        return y_pred   
+        df_avg_test = results_labels_df_test.groupby(ID_label).agg({
+                'y_labels': 'mean',
+                'y_pred': 'mean',
+                'y_pred_corrected': 'mean',
+                'GAP': 'mean',
+                'GAP_corrected': 'mean'
+            }).reset_index()
+
+
+        return results_labels_df_train, results_labels_df_test, results, results_per_fold_train, results_per_fold_test, df_avg_train, df_avg_test
 
 
 
-    def regression_metrics(self, y_true, y_pred):
-        """
-        Calcula las métricas de regresión: MAE, MSE, RMSE y R2.
-        """
-        mae = mean_absolute_error(y_true, y_pred)
-        mse = mean_squared_error(y_true, y_pred)
-        rmse = np.sqrt(mse)
-        r2 = r2_score(y_true, y_pred)
-        return mae, mse, rmse, r2
+    def test(self, X , y , ID,ID_label, n_splits=10, n_iterations=20, scaler=2, result_model= None):
+
+        results_per_fold_test = []
+        # Inicializar resultados  
+        
+        results_labels_df_test = pd.DataFrame(columns=['y_labels', 'y_pred', 'y_pred_corrected', 'GAP', 'GAP_corrected', ID_label])
+        
+
+        for i in range(n_iterations):
+            kf = KFold(n_splits=n_splits, shuffle=True, random_state=i)
+            kf_splits = list(kf.split(X, y))
+            for fold in range(n_splits):
+                train_index, test_index = kf_splits[fold]
+                X_train_pat = X.iloc[train_index, :]
+                X_test_pat = X.iloc[test_index, :]
+                y_test_pat = y.iloc[test_index]
+                id_test_pat = ID.iloc[test_index]
+
+                # Escalar usando los parámetros de CN
+                #X_test_pat_scaled = (X_test_pat - mean_X_train_kf) / std_X_train_kf
+
+                if scaler == 1:
+                    # No escalar                            
+                    X_test_pat_scaled = X_test_pat
+                elif scaler == 2:
+                    # Z-score scaling                            
+                    X_test_pat_scaled = (X_test_pat - result_model['mean_X_train_kf'][fold+i*10]) / result_model['std_X_train_kf'][fold+i*10]
+                elif scaler == 3:
+                    # MinMax scaling                           
+                    X_test_pat_scaled = (X_test_pat - result_model['min_X_train_kf'][fold+i*10]) / (result_model['max_X_train_kf'][fold+i*10] - result_model['min_X_train_kf'][fold+i*10])
+
+
+                # Predicciones para el grupo de pacientes
+                y_pred_pat_test = result_model['model'][fold+i*10].predict(X_test_pat_scaled)
+                gap_pat = y_pred_pat_test - y_test_pat
+
+                # Ajuste de GAP para los pacientes
+                corrected_gap_pat = gap_pat - (result_model['slope'][fold+i*10] * y_test_pat + result_model['intercept'][fold+i*10])
+                y_pred_corrected_pat = y_pred_pat_test - (result_model['slope'][fold+i*10] * y_test_pat + result_model['intercept'][fold+i*10])
+
+                # Guardar resultados para cada grupo de pacientes
+                temp_pat_df = pd.DataFrame({
+                    'y_labels': y_test_pat,
+                    'y_pred': y_pred_pat_test,
+                    'y_pred_corrected': y_pred_corrected_pat,
+                    'GAP': gap_pat,
+                    'GAP_corrected': corrected_gap_pat,
+                    ID_label: id_test_pat
+                })
+                results_labels_df_test = pd.concat([results_labels_df_test, temp_pat_df], ignore_index=True)
+                results_per_fold_test.append(temp_pat_df.copy())  # Guardar en la lista simple
+        
+        df_avg_test = results_labels_df_test.groupby(ID_label).agg({
+                'y_labels': 'mean',
+                'y_pred': 'mean',
+                'y_pred_corrected': 'mean',
+                'GAP': 'mean',
+                'GAP_corrected': 'mean'
+            }).reset_index()
+
+        return results_labels_df_test, results_per_fold_test, df_avg_test
+   
 
     def best_hyper(self, opt_model, num_best=10, num_max=400):
-        """
-        Obtiene los mejores hiperparámetros para las mejores puntuaciones de validación cruzada dentro de los primeros num_max resultados.
-       
-        """
+                
         results = opt_model.cv_results_
         errors = results['mean_test_score'][:num_max]  # Considerar solo los primeros num_max resultados
         best_idx = np.argsort(errors)[-num_best:]  # Obtener los índices de las mejores puntuaciones
@@ -366,78 +354,77 @@ class BaseRegressor:
         
         return shap_values, shap_summary_sorted
     
-    def calculate_multiple_shap(self, df_train, df_test, results_per_fold_train, results_per_fold_test, models_list, feature_col_range, iteration=20, kfolds_=10,  scaler=2, random_seed=42):
-        shap_values_dict = {id_unique: [] for id_unique in df_test['ID-unique'].unique()}
-        
-        range_ = iteration*kfolds_
-        
-        for i in range(range_):
+    def calculate_multiple_shap(self, df_train, df_test, ID_label, results_per_fold_train, results_per_fold_test, models_list,  iteration=20, kfolds_=10,  scaler=2, random_seed=42):
+        shap_values_dict = {id_unique: [] for id_unique in df_test[ID_label].unique()}
+        shap_per_fold = []  # Lista para almacenar SHAP values por fold e iteración
 
+        range_ = iteration * kfolds_
+
+        for i in range(range_):
             # Train
-            ID_train_fold = results_per_fold_train[i]['ID-unique']
-            df_train_fold = df_train[df_train['ID-unique'].isin(ID_train_fold)]
-            X_train_kf = df_train_fold.iloc[:, feature_col_range]  # Features
+            ID_train_fold = results_per_fold_train[i][ID_label]
+            df_train_fold = df_train[df_train[ID_label].isin(ID_train_fold)]
+            X_train_kf = df_train_fold.iloc[:, 0:-2]  # Features
             y_train_kf = df_train_fold.iloc[:, -2]  # Labels
 
             # Test
-            ID_test_fold = results_per_fold_test[i]['ID-unique']
-            df_test_fold = df_test[df_test['ID-unique'].isin(ID_test_fold)]
-            X_test_kf = df_test_fold.iloc[:, feature_col_range]  # Features
+            ID_test_fold = results_per_fold_test[i][ID_label]
+            df_test_fold = df_test[df_test[ID_label].isin(ID_test_fold)]
+            X_test_kf = df_test_fold.iloc[:, 0:-2]  # Features
             y_test_kf = df_test_fold.iloc[:, -2]  # Labels
 
+            # Escalado
             if scaler == 1:
-                # No escalar
                 X_train_kf_scaled = X_train_kf
                 X_test_kf_scaled = X_test_kf
             elif scaler == 2:
-                # Z-score scaling
                 mean_X_train_kf = X_train_kf.mean()
                 std_X_train_kf = X_train_kf.std()
                 X_train_kf_scaled = (X_train_kf - mean_X_train_kf) / std_X_train_kf
                 X_test_kf_scaled = (X_test_kf - mean_X_train_kf) / std_X_train_kf
             elif scaler == 3:
-                # MinMax scaling (manual)
                 min_X_train_kf = X_train_kf.min()
                 max_X_train_kf = X_train_kf.max()
                 X_train_kf_scaled = (X_train_kf - min_X_train_kf) / (max_X_train_kf - min_X_train_kf)
                 X_test_kf_scaled = (X_test_kf - min_X_train_kf) / (max_X_train_kf - min_X_train_kf)
 
-
             model_ = models_list[i]
 
+            # Cálculo de SHAP
             try:
-                self.explainer = shap.Explainer(model_,X_train_kf_scaled)
-                shap_values = self.explainer.shap_values(X_test_kf_scaled)
+                explainer = shap.Explainer(model_, X_train_kf_scaled)
+                shap_values = explainer.shap_values(X_test_kf_scaled)
             except Exception as e:
                 print("Fallo al usar shap.Explainer, intentando con shap.KernelExplainer:", e)
                 try:
                     np.random.seed(random_seed)
-                    self.explainer = shap.KernelExplainer(model_.predict, shap.sample(X_train_kf_scaled, 10), num_jobs=-1)
-                    shap_values = self.explainer.shap_values(X_test_kf_scaled)
+                    explainer = shap.KernelExplainer(model_.predict, shap.sample(X_train_kf_scaled, 10), num_jobs=-1)
+                    shap_values = explainer.shap_values(X_test_kf_scaled)
                 except Exception as kernel_e:
                     print("Fallo al usar shap.KernelExplainer:", kernel_e)
-                    return None, None 
+                    return None, None, None
 
-            # SHAP calculation
-            #explainer = shap.Explainer(model_, X_train_kf_scaled)
-            #shap_values = explainer.shap_values(X_test_kf_scaled)
+            # Almacenar valores SHAP por fold
+            shap_per_fold.append({
+                "fold": i,
+                "shap_values": shap_values,
+                "X_test_kf": X_test_kf_scaled,
+                "ID_test": ID_test_fold
+            })
 
             # Store SHAP values
-            for idx, id_unique in enumerate(df_test_fold['ID-unique']):
+            for idx, id_unique in enumerate(df_test_fold[ID_label]):
                 shap_values_dict[id_unique].append(shap_values[idx])
 
         # Average SHAP values
         shap_values_avg_dict = {id_unique: np.mean(values, axis=0) for id_unique, values in shap_values_dict.items()}
-
-        # Prepare SHAP summary matrix
-        shap_values_avg_matrix = [shap_values_avg_dict[id_unique] for id_unique in df_test['ID-unique'].unique()]
+        shap_values_avg_matrix = [shap_values_avg_dict[id_unique] for id_unique in df_test[ID_label].unique()]
         shap_values_avg_array = np.array(shap_values_avg_matrix)
 
         feature_names = X_test_kf_scaled.columns.tolist()
-
         shap_values_df = pd.DataFrame(shap_values_avg_array, columns=feature_names)
-        shap_values_df['ID-unique'] = df_test['ID-unique'].unique()
-        shap_values_df.set_index('ID-unique', inplace=True)
+        shap_values_df[ID_label] = df_test[ID_label].unique()
+        shap_values_df.set_index(ID_label, inplace=True)
 
         # SHAP summary
         shap_sum = np.abs(shap_values_avg_array).sum(axis=0)
@@ -449,7 +436,8 @@ class BaseRegressor:
         for feature, shap_sum in shap_summary_sorted:
             print(f"{feature}: {shap_sum}")
 
-        return shap_values_avg_array, shap_summary_sorted
+        return shap_values_dict, shap_values_avg_array, shap_summary_sorted, shap_per_fold
+    
 
 
     def shap_region(self, shap_summary_sorted, num_max=20):
@@ -486,3 +474,5 @@ class BaseRegressor:
             print(f'{region}: {valor_normalizado:.6f}')
 
         return shap_por_region_sorted, resultado_normalizado_sorted
+
+    
